@@ -1,40 +1,30 @@
 import pandas as pd
-from preprocessing.constants import continous_features, pre_final_list, pcrs, others, final_features, selected_features
-from preprocessing.transformations import split_data, features_data_types_pipeline, label_transformer
+from preprocessing.transformations import handle_syndrome_class
 from preprocessing.imputer import Imputer
-from preprocessing.outlier_detection import OutlierClipper
-from preprocessing.normalizer import Normalizer
-from preprocessing.feature_selection import select_features_filter, select_features_wrapper
-from preprocessing.visualize import display_correlation_matrix, save_scatter_plots, plot_df_scatter
-from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import RobustScaler
+
 
 class DataPreprocessor:
 
     def __init__(self):
-        self.data_preperation_pipelines = Pipeline([
-            ('feature_types', features_data_types_pipeline),
-            ('feature_imputation', Imputer()),
-            ('outlier_clipping', OutlierClipper(features=continous_features)),
-            ('normalization', Normalizer())
-        ])
+        self.imputer = Imputer()
+        self.scaler = RobustScaler(quantile_range=(0.15, 0.85), unit_variance=True)
 
     def fit(self, X, y, **kwargs):
-
-        self.data_preperation_pipelines.fit(X, y)
+        tmp_X = handle_syndrome_class(X)
+        self.imputer = self.imputer.fit(tmp_X, y)
+        tmp_X = self.imputer.transform(tmp_X)
+        self.scaler = self.scaler.fit(tmp_X, y)
 
         return self
     
     def transform(self, X, **kwargs):
-
-        X_transformed = self.data_preperation_pipelines.transform(X)
+        X_transformed = handle_syndrome_class(X)
+        X_transformed = self.imputer.transform(X_transformed)
+        X_transformed = pd.DataFrame(self.scaler.transform(X_transformed), columns=X_transformed.columns)
 
         return X_transformed
 
     def fit_transform(self, X, y, **kwargs):
         self.fit(X, y, **kwargs)
         return self.transform(X)
-
-def split(df):
-    X_train, X_val, X_test, y_train, y_val, y_test = split_data(df)
-    
-    return X_train, X_val, X_test, y_train, y_val, y_test
